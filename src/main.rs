@@ -13,33 +13,41 @@ use bincode::deserialize;
 use reverse_proxy::packet::*;
 
 fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
-    let mut buffer = [0; 30];
+    let mut buffer = [0; 64];
 
     loop {
-        let (_, tx) = socket.recv_from(&mut buffer).expect("Didn't receive data");
+        let (_, tx) = socket.recv_from(&mut buffer).unwrap();
         let data: Message = deserialize(&buffer).unwrap();
 
         match data.flag {
-            MessageType::ProbeResponse => continue,
+            MessageType::ProbeResponse => {
+                let response = ProbeResponse::from_message(data);
+                servers.receive(tx.ip(), response);
+            },
             MessageType::Registration  => servers.registrate(tx.ip()),
             MessageType::ProbeRequest  => unreachable!(),
         }
     }
 }
 
-fn start_sender(socket: UdpSocket, servers: &mut Arc<Monitor>) {
+fn start_sender(socket: UdpSocket, monitor: &mut Arc<Monitor>) {
     loop {
-        servers.send_probes(&socket);
+        monitor.send_probes(&socket);
         thread::sleep(Duration::from_secs(3));
+
+        match monitor.pick_server() {
+            Some(ip) => println!("Selected server {}!", ip),
+            None => println!("No servers available!"),
+        }
     }
 }
 
 fn main() {
-    let socket = UdpSocket::bind("localhost:5555").expect("Couldn't bind to address");
+    let socket = UdpSocket::bind("localhost:5555").expect("Failed while binding to the specified address");
     let mut servers = Arc::new(Monitor::new());
 
     {
-        let socket = socket.try_clone().expect("Couldn't obtain socket's copy");
+        let socket = socket.try_clone().expect("Failed while starting sender thread");
         let mut servers = servers.clone();
 
         thread::spawn(move || {

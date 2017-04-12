@@ -3,18 +3,14 @@ use bincode::{serialize, deserialize, Bounded};
 
 #[derive(Serialize, Deserialize)]
 pub struct ProbeRequest {
-    sequence_number : i32,
+    pub sequence: u32,
 }
 
 impl ProbeRequest {
-    pub fn new(seq: i32) -> ProbeRequest {
+    pub fn new(seq: u32) -> ProbeRequest {
         ProbeRequest {
-            sequence_number: seq,
+            sequence: seq,
         }
-    }
-
-    pub fn sequence(&self) -> i32 {
-        self.sequence_number
     }
 }
 

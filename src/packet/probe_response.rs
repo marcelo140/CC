@@ -1,30 +1,24 @@
+extern crate sys_info;
+
 use packet::message::*;
 use packet::probe_request::ProbeRequest;
 use bincode::{serialize, deserialize, Bounded};
 
 #[derive(Serialize, Deserialize)]
 pub struct ProbeResponse {
-    ack_number: i32,
-    load_average: f32,
+    pub ack_number: u32,
+    pub load: f64,
 }
 
 impl ProbeResponse {
-    pub fn new(ack : i32, load: f32) -> ProbeResponse {
-        ProbeResponse {
-            ack_number: ack,
-            load_average: load,
-        }
-    }
-
     pub fn from_request(request: ProbeRequest) -> ProbeResponse {
-        ProbeResponse {
-            ack_number: request.sequence() + 1,
-            load_average: 0.0,
-        }
-    }
+        let load = sys_info::loadavg().unwrap();
+        let cpu_num = sys_info::cpu_num().unwrap();
 
-    pub fn ack(&self) -> i32 {
-        self.ack_number
+        ProbeResponse {
+            ack_number: request.sequence + 1,
+            load: load.one / (cpu_num as f64),
+        }
     }
 }
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["escolhido <celocaridade@gmail.com>"]
 
 [dependencies]
+sys-info = "*"
 bincode = "1.0.0-alpha6"
 serde = "0.9"
 serde_derive = "0.9"
