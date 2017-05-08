@@ -64,7 +64,7 @@ impl Server {
 
     pub fn send(&self, socket: &UdpSocket, message: Message) {
         let buffer = serialize(&message, Bounded(64)).unwrap();
-        let addr = SocketAddr::new(self.ip_addr, 4000);
+        let addr = SocketAddr::new(self.ip_addr, 5555);
 
         socket.send_to(buffer.as_slice(), addr).expect("Failed to end probe");
     }

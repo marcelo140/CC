@@ -1,6 +1,7 @@
 extern crate bincode;
 extern crate reverse_proxy;
 
+use std::env;
 use std::thread;
 use std::net::UdpSocket;
 use std::time::Duration;
@@ -9,7 +10,7 @@ use bincode::{serialize, deserialize, Bounded};
 
 fn process_request(buffer: &[u8]) -> Message {
     let message : Message = deserialize(&buffer).unwrap();
-    let request  = ProbeRequest::from_message(message);
+    let request = ProbeRequest::from_message(message);
 
     ProbeResponse::from_request(request).into_message()
 }
@@ -18,11 +19,11 @@ fn start_receiver(socket : UdpSocket) {
     let mut buffer = [0; 255];
 
     loop {
-        let _ = socket.recv(&mut buffer);
+        let _ = socket.recv_from(&mut buffer).expect("Failed to receive data");
         let message = process_request(&buffer);
 
         let encoded = serialize(&message, Bounded(64)).unwrap();
-        let _ = socket.send_to(encoded.as_slice(), "localhost:5555");
+        let _ = socket.send(encoded.as_slice());
     }
 }
 
@@ -30,7 +31,7 @@ fn send_registration(socket: &UdpSocket) {
     let message = Message::new(MessageType::Registration, vec![]);
     let encoded = serialize(&message, Bounded(64)).unwrap();
 
-    let _ = socket.send_to(encoded.as_slice(), "localhost:5555");
+    let _ = socket.send(encoded.as_slice());
 }
 
 fn start_registrator(socket: UdpSocket) {
@@ -41,7 +42,17 @@ fn start_registrator(socket: UdpSocket) {
 }
 
 fn main() {
-    let socket = UdpSocket::bind("localhost:4000").expect("Couldn't bind to adress");
+    let socket = match env::args().nth(1) {
+        None => panic!("No IP address was provided for listening"),
+        Some(ip) => UdpSocket::bind((ip.as_str(), 5555))
+                              .expect("Failed while binding to the specified address"),
+    };
+
+    match env::args().nth(2) {
+        None => panic!("No IP address provided for the reverse proxy"),
+        Some(ip) => socket.connect((ip.as_str(), 5555))
+                          .expect("Failed while connecting to the specified server"),
+    };
 
     {
         let socket = socket.try_clone().expect("Couldn't get a socket copy");

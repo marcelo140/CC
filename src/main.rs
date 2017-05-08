@@ -4,11 +4,12 @@ extern crate reverse_proxy;
 mod server;
 mod monitor;
 
+use std::env;
 use std::thread;
 use std::sync::Arc;
+use monitor::Monitor;
 use std::time::Duration;
 use std::net::UdpSocket;
-use monitor::Monitor;
 use bincode::deserialize;
 use reverse_proxy::packet::*;
 
@@ -24,7 +25,9 @@ fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
                 let response = ProbeResponse::from_message(data);
                 servers.receive(tx.ip(), response);
             },
-            MessageType::Registration  => servers.registrate(tx.ip()),
+            MessageType::Registration  => {
+                servers.registrate(tx.ip());
+            },
             MessageType::ProbeRequest  => unreachable!(),
         }
     }
@@ -43,8 +46,13 @@ fn start_sender(socket: UdpSocket, monitor: &mut Arc<Monitor>) {
 }
 
 fn main() {
-    let socket = UdpSocket::bind("localhost:5555").expect("Failed while binding to the specified address");
     let mut servers = Arc::new(Monitor::new());
+
+    let socket = match env::args().nth(1) {
+        None => panic!("No IP address was provided for listening"),
+        Some(ip) => UdpSocket::bind((ip.as_str(), 5555))
+                              .expect("Failed while binding to the specified address"),
+    };
 
     {
         let socket = socket.try_clone().expect("Failed while starting sender thread");
