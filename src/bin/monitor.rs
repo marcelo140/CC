@@ -3,35 +3,39 @@ extern crate reverse_proxy;
 
 use std::env;
 use std::thread;
+use std::error::Error;
 use std::net::UdpSocket;
 use std::time::Duration;
 use reverse_proxy::packet::*;
-use bincode::{serialize, deserialize, Bounded};
 
-fn process_request(buffer: &[u8]) -> Message {
-    let message : Message = deserialize(&buffer).unwrap();
-    let request = ProbeRequest::from_message(message);
+macro_rules! exit {
+    ($msg:expr) => {{ println!($msg); return }};
+}
 
-    ProbeResponse::from_request(request).into_message()
+fn process_request(buffer: &[u8]) -> Result<ProbeResponse, MsgErr> {
+    ProbeRequest::from_bytes(buffer).map(ProbeResponse::from_request)
 }
 
 fn start_receiver(socket : UdpSocket) {
-    let mut buffer = [0; 255];
+    let mut buffer = [0; 64];
 
     loop {
-        let _ = socket.recv_from(&mut buffer).expect("Failed to receive data");
-        let message = process_request(&buffer);
+        socket.recv_from(&mut buffer).unwrap();
+        let res = process_request(&buffer).and_then(|r| r.into_bytes());
 
-        let encoded = serialize(&message, Bounded(64)).unwrap();
-        let _ = socket.send(encoded.as_slice());
+        let _ = match res {
+            Ok(res) => socket.send(res.as_slice()),
+            Err(e) => {
+                println!("Could not handle request: {}", e.description());
+                continue;
+            }
+        };
     }
 }
 
 fn send_registration(socket: &UdpSocket) {
-    let message = Message::new(MessageType::Registration, vec![]);
-    let encoded = serialize(&message, Bounded(64)).unwrap();
-
-    let _ = socket.send(encoded.as_slice());
+    let registration = Message::new_registration().unwrap();
+    let _ = socket.send(registration.as_slice());
 }
 
 fn start_registrator(socket: UdpSocket) {
@@ -43,15 +47,13 @@ fn start_registrator(socket: UdpSocket) {
 
 fn main() {
     let socket = match env::args().nth(1) {
-        None => panic!("No IP address was provided for listening"),
-        Some(ip) => UdpSocket::bind((ip.as_str(), 5555))
-                              .expect("Failed while binding to the specified address"),
+        None => exit!("No IP address provided for listening"),
+        Some(ip) => UdpSocket::bind((ip.as_str(), 5555)).unwrap(),
     };
 
     match env::args().nth(2) {
-        None => panic!("No IP address provided for the reverse proxy"),
-        Some(ip) => socket.connect((ip.as_str(), 5555))
-                          .expect("Failed while connecting to the specified server"),
+        None => exit!("No proxy IP address provided"),
+        Some(ip) => socket.connect((ip.as_str(), 5555)).unwrap(),
     };
 
     {

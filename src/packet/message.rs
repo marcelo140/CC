@@ -1,3 +1,7 @@
+use bincode::{deserialize, serialize, Bounded, Error};
+
+pub type MsgErr = Error;
+
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum MessageType {
     Registration,
@@ -18,12 +22,25 @@ impl Message {
             content: content,
         }
     }
+
+    pub fn new_registration() -> Result<Vec<u8>, MsgErr> {
+        let message = Message {
+            flag: MessageType::Registration,
+            content: vec![],
+        };
+
+        serialize(&message, Bounded(64))
+    }
+
+    pub fn deserialize(buffer: &[u8]) -> Result<Message, MsgErr> {
+        deserialize(&buffer)
+    }
 }
 
-pub trait IntoMessage {
-    fn into_message(self) -> Message;
-}
+pub trait SerializablePacket<T> {
+    fn into_message(self) -> Result<Message, MsgErr>;
+    fn from_message(buffer: Message) -> Result<T, MsgErr>;
 
-pub trait FromMessage {
-    fn from_message(m: Message) -> Self;
+    fn into_bytes(self) -> Result<Vec<u8>, MsgErr>;
+    fn from_bytes(buffer: &[u8]) -> Result<T, MsgErr>;
 }

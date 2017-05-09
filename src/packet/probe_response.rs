@@ -10,6 +10,7 @@ pub struct ProbeResponse {
     pub load: f64,
 }
 
+
 impl ProbeResponse {
     pub fn from_request(request: ProbeRequest) -> ProbeResponse {
         let load = sys_info::loadavg().unwrap();
@@ -22,17 +23,25 @@ impl ProbeResponse {
     }
 }
 
-impl IntoMessage for ProbeResponse {
-    fn into_message(self) -> Message {
-        let mut content = Vec::new();
-        content.extend_from_slice(&serialize(&self, Bounded(64)).unwrap());
-
-        Message::new(MessageType::ProbeResponse, content)
+impl SerializablePacket<ProbeResponse> for ProbeResponse {
+    fn into_message(self) -> Result<Message, MsgErr> {
+        serialize(&self, Bounded(64))
+            .map(|content| Message::new(MessageType::ProbeResponse, content))
     }
-}
 
-impl FromMessage for ProbeResponse {
-    fn from_message(m: Message) -> ProbeResponse {
-        deserialize(&m.content).unwrap()
+    fn from_message(message: Message) -> Result<ProbeResponse, MsgErr> {
+        deserialize(&message.content)
+    }
+
+    fn into_bytes(self) -> Result<Vec<u8>, MsgErr> {
+        serialize(&self, Bounded(64))
+            .map(|content| Message::new(MessageType::ProbeResponse, content))
+            .and_then(|message| serialize(&message, Bounded(64)))
+    }
+
+    fn from_bytes(buffer: &[u8]) -> Result<ProbeResponse, MsgErr> {
+        deserialize(&buffer).and_then(|msg: Message|
+            deserialize(&msg.content)
+        )
     }
 }

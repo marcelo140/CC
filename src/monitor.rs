@@ -34,7 +34,7 @@ impl Monitor {
                 continue;
             }
 
-            let message = server.next_probe().into_message();
+            let message = server.next_probe().into_message().unwrap();
             server.send(socket, message);
         }
 
