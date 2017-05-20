@@ -23,6 +23,22 @@ impl Monitor {
         server.registrate();
     }
 
+    pub fn inc_connections(&self, addr: IpAddr) {
+        let mut servers = self.servers.lock().unwrap();
+        match servers.get_mut(&addr) {
+            Some(s) => s.inc_connections(),
+            _ => println!("Server is no longer available"),
+        }
+    }
+
+    pub fn dec_connections(&self, addr: IpAddr) {
+        let mut servers = self.servers.lock().unwrap();
+        match servers.get_mut(&addr) {
+            Some(s) => s.dec_connections(),
+            _ => println!("Server is no longer available"),
+        }
+    }
+
     pub fn send_probes(&self, socket: &UdpSocket) {
         let mut servers = self.servers.lock().unwrap();
         let mut removable = Vec::new();
@@ -52,11 +68,11 @@ impl Monitor {
 
     pub fn pick_server(&self) -> Option<IpAddr> {
         let (mut red, mut yellow) = (None, None);
-        let avg = self.avg_rtt();
+        let (rtt, lost, conn) = self.calculate_averages();
         let servers = self.servers.lock().unwrap();
 
         for (ip, s) in &(*servers) {
-            match s.get_status(avg) {
+            match s.get_status(rtt, lost, conn) {
                 ServerStatus::Green => return Some(*ip),
                 ServerStatus::Yellow => yellow = Some(*ip),
                 ServerStatus::Red => red = Some(*ip),
@@ -69,12 +85,17 @@ impl Monitor {
         }
     }
 
-    fn avg_rtt(&self) -> f64 {
+    fn calculate_averages(&self) -> (f64, f64, u32) {
         let servers = self.servers.lock().unwrap();
 
-        let sum = servers.values().fold(0f64, |acc, ref s| acc + s.get_rtt());
-        let avg = sum / (servers.len() as f64);
+        let rtt = servers.values().fold(0f64, |acc, ref s| acc + s.get_rtt());
+        let lost = servers.values().fold(0f64, |acc, ref s| acc + s.get_lost());
+        let conn = servers.values().fold(0u32, |acc, ref s| acc + s.get_conn());
 
-        return avg;
+        let avg_rtt = rtt / (servers.len() as f64);
+        let avg_lost = lost / (servers.len() as f64);
+        let avg_conn = conn / (servers.len() as u32);
+
+        return (avg_rtt, avg_lost, avg_conn);
     }
 }

@@ -1,4 +1,3 @@
-extern crate bincode;
 extern crate reverse_proxy;
 
 use std::env;
@@ -52,14 +51,41 @@ fn start_listener(monitor: &mut Arc<Monitor>) {
         };
 
         let mut server = match monitor.pick_server() {
-            Some(ip) => TcpStream::connect((ip, 80)).unwrap(),
+            Some(ip) => {
+                monitor.inc_connections(ip);
+                TcpStream::connect((ip, 80)).unwrap()
+            },
             None => {
                 println!("No available server!");
                 continue;
             },
         };
 
-        handle_connection(&mut client, &mut server);
+        let mut _monitor = monitor.clone();
+        handle_connection(&mut _monitor, &mut client, &mut server);
+    }
+}
+
+fn handle_connection(monitor: &mut Arc<Monitor>, client: &mut TcpStream,
+                     server: &mut TcpStream) {
+    {
+        let mut client = client.try_clone().unwrap();
+        let mut server = server.try_clone().unwrap();
+
+        thread::spawn(move || {
+            forward(&mut client, &mut server);
+        });
+    }
+
+    {
+        let mut client = client.try_clone().unwrap();
+        let mut server = server.try_clone().unwrap();
+        let monitor = monitor.clone();
+
+        thread::spawn(move || {
+            forward(&mut server, &mut client);
+            monitor.dec_connections(server.peer_addr().unwrap().ip())
+        });
     }
 }
 
@@ -76,26 +102,6 @@ fn forward(from: &mut TcpStream, to: &mut TcpStream) {
             Ok(s) => s,
             Err(_) => break,
         };
-    }
-}
-
-fn handle_connection(client: &mut TcpStream, server: &mut TcpStream) {
-    {
-        let mut client = client.try_clone().unwrap();
-        let mut server = server.try_clone().unwrap();
-
-        thread::spawn(move || {
-            forward(&mut client, &mut server);
-        });
-    }
-
-    {
-        let mut client = client.try_clone().unwrap();
-        let mut server = server.try_clone().unwrap();
-
-        thread::spawn(move || {
-            forward(&mut server, &mut client);
-        });
     }
 }
 

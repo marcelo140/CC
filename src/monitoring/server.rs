@@ -9,6 +9,7 @@ pub struct Server {
     lost: u32,
     rtt: f64,
     load: f64,
+    connections: u32,
     last_response: u32,
     last_sent : Instant,
     last_registration : Instant,
@@ -22,6 +23,7 @@ impl Server {
             lost: 0,
             rtt: 0.0,
             load: 0.0,
+            connections: 0,
             last_response: 0,
             last_sent: Instant::now(),
             last_registration : Instant::now(),
@@ -39,8 +41,24 @@ impl Server {
         self.last_registration.elapsed().as_secs() > 5
     }
 
+    pub fn get_conn(&self) -> u32 {
+        self.connections
+    }
+
+    pub fn inc_connections(&mut self) {
+        self.connections += 1;
+    }
+
+    pub fn dec_connections(&mut self) {
+        self.connections -= 1;
+    }
+
     pub fn get_rtt(&self) -> f64 {
         self.rtt
+    }
+
+    pub fn get_lost(&self) -> f64 {
+        (self.lost as f64) / (self.sequence as f64)
     }
 
     pub fn send(&self, socket: &UdpSocket, message: Message) {
@@ -60,18 +78,22 @@ impl Server {
         self.rtt*0.875 + rtt_sample*0.125
     }
 
-    pub fn get_status(&self, avg_rtt: f64) -> ServerStatus {
+    pub fn get_status(&self, avg_rtt: f64, avg_lost: f64, avg_conn: u32) -> ServerStatus {
         let mut status = ServerStatus::Green;
 
         if self.load > 0.7 {
             status = status.deteriorate();
         }
 
-        if (self.lost as f64) / (self.sequence as f64) > 0.2 {
+        if self.get_lost() > avg_lost {
             status = status.deteriorate();
         }
 
         if self.rtt > avg_rtt {
+            status = status.deteriorate();
+        }
+
+        if self.connections > avg_conn {
             status = status.deteriorate();
         }
 

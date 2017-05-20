@@ -1,4 +1,3 @@
-extern crate bincode;
 extern crate reverse_proxy;
 
 use std::env;
