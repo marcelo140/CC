@@ -32,6 +32,10 @@ impl Message {
         serialize(&message, Bounded(64))
     }
 
+    pub fn serialize(self) -> Result<Vec<u8>, MsgErr> {
+        serialize(&self, Bounded(64))
+    }
+
     pub fn deserialize(buffer: &[u8]) -> Result<Message, MsgErr> {
         deserialize(&buffer)
     }

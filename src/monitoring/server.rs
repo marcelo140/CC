@@ -1,29 +1,10 @@
-extern crate reverse_proxy;
-extern crate bincode;
-
-use bincode::{serialize, Bounded};
-use self::reverse_proxy::packet::*;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::time::Instant;
-
-pub enum ServerStatus {
-    Green,
-    Yellow,
-    Red,
-}
-
-impl ServerStatus {
-    fn deteriorate(self) -> ServerStatus {
-        match self {
-            ServerStatus::Green  => ServerStatus::Yellow,
-            ServerStatus::Yellow => ServerStatus::Red,
-            ServerStatus::Red    => ServerStatus::Red,
-        }
-    }
-}
+use packet::*;
+use monitoring::ServerStatus;
 
 pub struct Server {
-    ip_addr: IpAddr,
+    addr: SocketAddr,
     sequence: u32,
     lost: u32,
     rtt: f64,
@@ -36,7 +17,7 @@ pub struct Server {
 impl Server {
     pub fn new(ip: IpAddr) -> Server {
         Server {
-            ip_addr: ip,
+            addr: SocketAddr::new(ip, 5555),
             sequence: 0,
             lost: 0,
             rtt: 0.0,
@@ -63,10 +44,8 @@ impl Server {
     }
 
     pub fn send(&self, socket: &UdpSocket, message: Message) {
-        let buffer = serialize(&message, Bounded(64)).unwrap();
-        let addr = SocketAddr::new(self.ip_addr, 5555);
-
-        socket.send_to(buffer.as_slice(), addr).expect("Failed to end probe");
+        let buffer = message.serialize().unwrap();
+        socket.send_to(buffer.as_slice(), self.addr).expect("Failed to send probe");
     }
 
     pub fn registrate(&mut self) {
@@ -99,7 +78,7 @@ impl Server {
         return status;
     }
 
-    pub fn response(&mut self, response: ProbeResponse) {
+    pub fn handle_response(&mut self, response: ProbeResponse) {
         if response.ack_number != self.sequence {
             return;
         }

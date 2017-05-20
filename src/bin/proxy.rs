@@ -1,17 +1,14 @@
 extern crate bincode;
 extern crate reverse_proxy;
 
-mod server;
-mod monitor;
-
 use std::env;
 use std::thread;
 use std::sync::Arc;
-use monitor::Monitor;
 use std::time::Duration;
 use std::io::{Read, Write};
-use reverse_proxy::packet::*;
 use std::net::{TcpListener, TcpStream, UdpSocket};
+use reverse_proxy::packet::*;
+use reverse_proxy::monitoring::*;
 
 macro_rules! exit {
     ($msg:expr) => {{ println!($msg); return }};
@@ -27,7 +24,7 @@ fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
         match data.flag {
             MessageType::ProbeResponse => {
                 let res = ProbeResponse::from_message(data).unwrap();
-                servers.receive(tx.ip(), res);
+                servers.handle_response(tx.ip(), res);
             },
             MessageType::Registration => servers.registrate(tx.ip()),
             MessageType::ProbeRequest  => unreachable!(),

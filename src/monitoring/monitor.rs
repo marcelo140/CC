@@ -1,10 +1,9 @@
-extern crate reverse_proxy;
-
-use reverse_proxy::packet::*;
 use std::net::{UdpSocket, IpAddr};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-use server::{ServerStatus, Server};
+use packet::*;
+use monitoring::Server;
+use monitoring::ServerStatus;
 
 pub struct Monitor {
     servers: Mutex<BTreeMap<IpAddr, Server>>
@@ -43,11 +42,11 @@ impl Monitor {
         }
     }
 
-    pub fn receive(&self, addr: IpAddr, response: ProbeResponse) {
+    pub fn handle_response(&self, addr: IpAddr, response: ProbeResponse) {
         let mut servers = self.servers.lock().unwrap();
 
         if let Some(record) = servers.get_mut(&addr) {
-            record.response(response);
+            record.handle_response(response);
         }
     }
 
