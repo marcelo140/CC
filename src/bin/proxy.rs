@@ -2,6 +2,7 @@ extern crate reverse_proxy;
 
 use std::env;
 use std::thread;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use std::io::{Read, Write};
@@ -50,8 +51,11 @@ fn start_listener(monitor: &mut Arc<Monitor>) {
             _ => continue,
         };
 
+        println!("Accepted new connection!");
+
         let mut server = match monitor.pick_server() {
             Some(ip) => {
+                println!("Selected ip: {}", ip);
                 monitor.inc_connections(ip);
                 TcpStream::connect((ip, 80)).unwrap()
             },
@@ -93,14 +97,23 @@ fn forward(from: &mut TcpStream, to: &mut TcpStream) {
     let mut buffer = [0; 4096];
 
     loop {
-        let _ = match from.read(&mut buffer) {
+        let size = match from.read(&mut buffer) {
+            Ok(0) => break,
             Ok(s) => s,
-            Err(_) => break,
+            Err(e) => {
+                println!("Error while reading from TCP socket: {}", e.description());
+                break;
+            },
         };
 
-        let _ = match to.write(&buffer) {
+        let (content, _) = buffer.split_at(size);
+
+        let _ = match to.write(&content) {
             Ok(s) => s,
-            Err(_) => break,
+            Err(e) => {
+                println!("Error while writing to TCP socket: {}", e.description());
+                break;
+            },
         };
     }
 }

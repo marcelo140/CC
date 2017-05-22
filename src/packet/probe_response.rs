@@ -7,7 +7,7 @@ use bincode::{serialize, deserialize, Bounded};
 #[derive(Serialize, Deserialize)]
 pub struct ProbeResponse {
     pub ack_number: u32,
-    pub load: f64,
+    pub load: f32,
 }
 
 
@@ -18,7 +18,7 @@ impl ProbeResponse {
 
         ProbeResponse {
             ack_number: request.sequence + 1,
-            load: load.one / (cpu_num as f64),
+            load: (load.one as f32) / (cpu_num as f32),
         }
     }
 }

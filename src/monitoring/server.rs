@@ -1,14 +1,13 @@
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::time::Instant;
 use packet::*;
-use monitoring::ServerStatus;
 
 pub struct Server {
     addr: SocketAddr,
     sequence: u32,
     lost: u32,
-    rtt: f64,
-    load: f64,
+    rtt: f32,
+    load: f32,
     connections: u32,
     last_response: u32,
     last_sent : Instant,
@@ -53,12 +52,16 @@ impl Server {
         self.connections -= 1;
     }
 
-    pub fn get_rtt(&self) -> f64 {
+    pub fn get_load(&self) -> f32 {
+        self.load
+    }
+
+    pub fn get_rtt(&self) -> f32 {
         self.rtt
     }
 
-    pub fn get_lost(&self) -> f64 {
-        (self.lost as f64) / (self.sequence as f64)
+    pub fn get_lost(&self) -> f32 {
+        (self.lost as f32) / (self.sequence as f32)
     }
 
     pub fn send(&self, socket: &UdpSocket, message: Message) {
@@ -70,31 +73,32 @@ impl Server {
         self.last_registration = Instant::now();
     }
 
-    fn update_rtt(&self) -> f64 {
+    fn update_rtt(&self) -> f32 {
         let elapsed = self.last_sent.elapsed();
         let rtt_sample =
-            (elapsed.as_secs() as f64) * 10f64.powi(9) + (elapsed.subsec_nanos() as f64);
+            (elapsed.as_secs() as f32) * 10f32.powi(9) + (elapsed.subsec_nanos() as f32);
 
         self.rtt*0.875 + rtt_sample*0.125
     }
 
-    pub fn get_status(&self, avg_rtt: f64, avg_lost: f64, avg_conn: u32) -> ServerStatus {
-        let mut status = ServerStatus::Green;
+    pub fn get_status(&self, maximuns: (f32, f32, f32, u32)) -> f32 {
+        let mut status = 0f32;
+        let (load, lost, rtt, connections) = maximuns;
 
-        if self.load > 0.7 {
-            status = status.deteriorate();
+        if load != 0.0 {
+            status += self.load / load;
         }
 
-        if self.get_lost() > avg_lost {
-            status = status.deteriorate();
+        if lost != 0.0 {
+            status += self.get_lost() / lost;
         }
 
-        if self.rtt > avg_rtt {
-            status = status.deteriorate();
+        if rtt != 0.0 {
+            status += self.rtt / rtt;
         }
 
-        if self.connections > avg_conn {
-            status = status.deteriorate();
+        if connections != 0 {
+            status += (self.connections as f32) / (connections as f32);
         }
 
         return status;

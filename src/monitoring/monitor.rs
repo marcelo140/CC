@@ -1,9 +1,9 @@
+use std::cmp::Ordering::Equal;
 use std::net::{UdpSocket, IpAddr};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use packet::*;
 use monitoring::Server;
-use monitoring::ServerStatus;
 
 pub struct Monitor {
     servers: Mutex<BTreeMap<IpAddr, Server>>
@@ -67,35 +67,33 @@ impl Monitor {
     }
 
     pub fn pick_server(&self) -> Option<IpAddr> {
-        let (mut red, mut yellow) = (None, None);
-        let (rtt, lost, conn) = self.calculate_averages();
+        let maximums = self.get_maximums();
         let servers = self.servers.lock().unwrap();
+        let mut aux = Vec::new();
 
         for (ip, s) in &(*servers) {
-            match s.get_status(rtt, lost, conn) {
-                ServerStatus::Green => return Some(*ip),
-                ServerStatus::Yellow => yellow = Some(*ip),
-                ServerStatus::Red => red = Some(*ip),
-            }
+            aux.push((ip, s.get_status(maximums)));
         }
 
-        match yellow {
-            Some(_) => return yellow,
-            None => return red,
+        aux.sort_by(|x,y| (x.1).partial_cmp(&y.1).unwrap_or(Equal));
+        match aux.first() {
+            Some(v) => Some(*v.0),
+            None => None,
         }
     }
 
-    fn calculate_averages(&self) -> (f64, f64, u32) {
+    fn get_maximums(&self) -> (f32, f32, f32, u32) {
         let servers = self.servers.lock().unwrap();
 
-        let rtt = servers.values().fold(0f64, |acc, ref s| acc + s.get_rtt());
-        let lost = servers.values().fold(0f64, |acc, ref s| acc + s.get_lost());
-        let conn = servers.values().fold(0u32, |acc, ref s| acc + s.get_conn());
+        let max_load = servers.values().map(|s| s.get_load())
+            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
+        let max_rtt = servers.values().map(|s| s.get_rtt())
+            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
+        let max_lost = servers.values().map(|s| s.get_lost())
+            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
+        let max_conn = servers.values().map(|s| s.get_conn())
+            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0);
 
-        let avg_rtt = rtt / (servers.len() as f64);
-        let avg_lost = lost / (servers.len() as f64);
-        let avg_conn = conn / (servers.len() as u32);
-
-        return (avg_rtt, avg_lost, avg_conn);
+        return (max_load, max_lost, max_rtt, max_conn);
     }
 }
