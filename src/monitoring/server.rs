@@ -101,6 +101,7 @@ impl Server {
             status += (self.connections as f32) / (connections as f32);
         }
 
+        println!("Server {}: {}", self.addr, status);
         return status;
     }
 
