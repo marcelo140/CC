@@ -39,22 +39,27 @@ impl Monitor {
         }
     }
 
-    pub fn send_probes(&self, socket: &UdpSocket) {
+    pub fn clean_unregisted(&self) {
         let mut servers = self.servers.lock().unwrap();
         let mut removable = Vec::new();
 
-        for (ip_addr, server) in servers.iter_mut() {
+        for (ip_addr, server) in servers.iter() {
             if server.timeout() {
                 removable.push(*ip_addr);
-                continue;
             }
-
-            let message = server.next_probe().into_message().unwrap();
-            server.send(socket, message);
         }
 
         for server in removable {
             servers.remove(&server);
+        }
+    }
+
+    pub fn send_probes(&self, socket: &UdpSocket) {
+        let mut servers = self.servers.lock().unwrap();
+
+        for (ip_addr, server) in servers.iter_mut() {
+            let message = server.next_probe().into_message().unwrap();
+            server.send(socket, message);
         }
     }
 

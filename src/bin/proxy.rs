@@ -34,6 +34,7 @@ fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
 
 fn start_sender(socket: UdpSocket, monitor: &mut Arc<Monitor>) {
     loop {
+        monitor.clean_unregisted();
         monitor.send_probes(&socket);
         thread::sleep(Duration::from_secs(3));
     }
@@ -51,8 +52,7 @@ fn start_listener(monitor: &mut Arc<Monitor>) {
             _ => continue,
         };
 
-        println!("Accepted new connection!");
-
+        monitor.clean_unregisted();
         let mut server = match monitor.pick_server() {
             Some(ip) => {
                 println!("Selected ip: {}", ip);

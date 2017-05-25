@@ -37,7 +37,7 @@ impl Server {
     }
 
     pub fn timeout(&self) -> bool {
-        self.last_registration.elapsed().as_secs() > 5
+        self.last_registration.elapsed().as_secs() > 6
     }
 
     pub fn get_conn(&self) -> u32 {
