@@ -1,6 +1,6 @@
+use packet::*;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::time::Instant;
-use packet::*;
 
 pub struct Server {
     addr: SocketAddr,
@@ -10,8 +10,8 @@ pub struct Server {
     load: f32,
     connections: u32,
     last_response: u32,
-    last_sent : Instant,
-    last_registration : Instant,
+    last_sent: Instant,
+    last_registration: Instant,
 }
 
 impl Server {
@@ -25,7 +25,7 @@ impl Server {
             connections: 0,
             last_response: 0,
             last_sent: Instant::now(),
-            last_registration : Instant::now(),
+            last_registration: Instant::now(),
         }
     }
 
@@ -66,7 +66,9 @@ impl Server {
 
     pub fn send(&self, socket: &UdpSocket, message: Message) {
         let buffer = message.serialize().unwrap();
-        socket.send_to(buffer.as_slice(), self.addr).expect("Failed to send probe");
+        socket
+            .send_to(buffer.as_slice(), self.addr)
+            .expect("Failed to send probe");
     }
 
     pub fn registrate(&mut self) {
@@ -78,7 +80,7 @@ impl Server {
         let rtt_sample =
             (elapsed.as_secs() as f32) * 10f32.powi(9) + (elapsed.subsec_nanos() as f32);
 
-        self.rtt*0.875 + rtt_sample*0.125
+        self.rtt * 0.875 + rtt_sample * 0.125
     }
 
     pub fn get_status(&self, maximuns: (f32, f32, f32, u32)) -> f32 {
@@ -102,7 +104,7 @@ impl Server {
         }
 
         println!("Server {}: {}", self.addr, status);
-        return status;
+        status
     }
 
     pub fn handle_response(&mut self, response: ProbeResponse) {

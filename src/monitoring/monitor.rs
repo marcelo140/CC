@@ -1,12 +1,12 @@
-use std::cmp::Ordering::Equal;
-use std::net::{UdpSocket, IpAddr};
-use std::collections::BTreeMap;
-use std::sync::Mutex;
-use packet::*;
 use monitoring::Server;
+use packet::*;
+use std::cmp::Ordering::Equal;
+use std::collections::BTreeMap;
+use std::net::{IpAddr, UdpSocket};
+use std::sync::Mutex;
 
 pub struct Monitor {
-    servers: Mutex<BTreeMap<IpAddr, Server>>
+    servers: Mutex<BTreeMap<IpAddr, Server>>,
 }
 
 impl Monitor {
@@ -18,7 +18,7 @@ impl Monitor {
 
     pub fn registrate(&self, addr: IpAddr) {
         let mut servers = self.servers.lock().unwrap();
-        let mut server = servers.entry(addr).or_insert(Server::new(addr));
+        let server = servers.entry(addr).or_insert_with(|| Server::new(addr));
 
         server.registrate();
     }
@@ -57,7 +57,7 @@ impl Monitor {
     pub fn send_probes(&self, socket: &UdpSocket) {
         let mut servers = self.servers.lock().unwrap();
 
-        for (ip_addr, server) in servers.iter_mut() {
+        for (_, server) in servers.iter_mut() {
             let message = server.next_probe().into_message().unwrap();
             server.send(socket, message);
         }
@@ -80,7 +80,7 @@ impl Monitor {
             aux.push((ip, s.get_status(maximums)));
         }
 
-        aux.sort_by(|x,y| (x.1).partial_cmp(&y.1).unwrap_or(Equal));
+        aux.sort_by(|x, y| (x.1).partial_cmp(&y.1).unwrap_or(Equal));
         match aux.first() {
             Some(v) => Some(*v.0),
             None => None,
@@ -90,15 +90,27 @@ impl Monitor {
     fn get_maximums(&self) -> (f32, f32, f32, u32) {
         let servers = self.servers.lock().unwrap();
 
-        let max_load = servers.values().map(|s| s.get_load())
-            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
-        let max_rtt = servers.values().map(|s| s.get_rtt())
-            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
-        let max_lost = servers.values().map(|s| s.get_lost())
-            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0.0);
-        let max_conn = servers.values().map(|s| s.get_conn())
-            .max_by(|x,y| x.partial_cmp(y).unwrap_or(Equal)).unwrap_or(0);
+        let max_load = servers
+            .values()
+            .map(|s| s.get_load())
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(Equal))
+            .unwrap_or(0.0);
+        let max_rtt = servers
+            .values()
+            .map(|s| s.get_rtt())
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(Equal))
+            .unwrap_or(0.0);
+        let max_lost = servers
+            .values()
+            .map(|s| s.get_lost())
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(Equal))
+            .unwrap_or(0.0);
+        let max_conn = servers
+            .values()
+            .map(|s| s.get_conn())
+            .max_by(|x, y| x.partial_cmp(y).unwrap_or(Equal))
+            .unwrap_or(0);
 
-        return (max_load, max_lost, max_rtt, max_conn);
+        (max_load, max_lost, max_rtt, max_conn)
     }
 }

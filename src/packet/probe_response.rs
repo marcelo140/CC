@@ -1,15 +1,14 @@
 extern crate sys_info;
 
+use bincode::{deserialize, serialize, Bounded};
 use packet::message::*;
 use packet::probe_request::ProbeRequest;
-use bincode::{serialize, deserialize, Bounded};
 
 #[derive(Serialize, Deserialize)]
 pub struct ProbeResponse {
     pub ack_number: u32,
     pub load: f32,
 }
-
 
 impl ProbeResponse {
     pub fn from_request(request: ProbeRequest) -> ProbeResponse {
@@ -40,8 +39,6 @@ impl SerializablePacket<ProbeResponse> for ProbeResponse {
     }
 
     fn from_bytes(buffer: &[u8]) -> Result<ProbeResponse, MsgErr> {
-        deserialize(&buffer).and_then(|msg: Message|
-            deserialize(&msg.content)
-        )
+        deserialize(&buffer).and_then(|msg: Message| deserialize(&msg.content))
     }
 }

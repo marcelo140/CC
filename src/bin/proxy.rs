@@ -1,20 +1,23 @@
 extern crate reverse_proxy;
 
+use reverse_proxy::monitoring::*;
+use reverse_proxy::packet::*;
 use std::env;
-use std::thread;
 use std::error::Error;
-use std::sync::Arc;
-use std::time::Duration;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, UdpSocket};
-use reverse_proxy::packet::*;
-use reverse_proxy::monitoring::*;
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 macro_rules! exit {
-    ($msg:expr) => {{ println!($msg); return }};
+    ($msg:expr) => {{
+        println!($msg);
+        return;
+    }};
 }
 
-fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
+fn start_receiver(socket: &UdpSocket, servers: &mut Arc<Monitor>) {
     let mut buffer = [0; 64];
 
     loop {
@@ -25,14 +28,14 @@ fn start_receiver(socket: UdpSocket, servers: &mut Arc<Monitor>) {
             MessageType::ProbeResponse => {
                 let res = ProbeResponse::from_message(data).unwrap();
                 servers.handle_response(tx.ip(), res);
-            },
+            }
             MessageType::Registration => servers.registrate(tx.ip()),
-            MessageType::ProbeRequest  => unreachable!(),
+            MessageType::ProbeRequest => unreachable!(),
         }
     }
 }
 
-fn start_sender(socket: UdpSocket, monitor: &mut Arc<Monitor>) {
+fn start_sender(socket: &UdpSocket, monitor: &mut Arc<Monitor>) {
     loop {
         monitor.clean_unregisted();
         monitor.send_probes(&socket);
@@ -58,11 +61,11 @@ fn start_listener(monitor: &mut Arc<Monitor>) {
                 println!("Selected ip: {}", ip);
                 monitor.inc_connections(ip);
                 TcpStream::connect((ip, 80)).unwrap()
-            },
+            }
             None => {
                 println!("No available server!");
                 continue;
-            },
+            }
         };
 
         let mut _monitor = monitor.clone();
@@ -70,8 +73,7 @@ fn start_listener(monitor: &mut Arc<Monitor>) {
     }
 }
 
-fn handle_connection(monitor: &mut Arc<Monitor>, client: &mut TcpStream,
-                     server: &mut TcpStream) {
+fn handle_connection(monitor: &mut Arc<Monitor>, client: &mut TcpStream, server: &mut TcpStream) {
     {
         let mut client = client.try_clone().unwrap();
         let mut server = server.try_clone().unwrap();
@@ -103,7 +105,7 @@ fn forward(from: &mut TcpStream, to: &mut TcpStream) {
             Err(e) => {
                 println!("Error while reading from TCP socket: {}", e.description());
                 break;
-            },
+            }
         };
 
         let (content, _) = buffer.split_at(size);
@@ -113,7 +115,7 @@ fn forward(from: &mut TcpStream, to: &mut TcpStream) {
             Err(e) => {
                 println!("Error while writing to TCP socket: {}", e.description());
                 break;
-            },
+            }
         };
     }
 }
@@ -127,11 +129,13 @@ fn main() {
     };
 
     {
-        let socket = socket.try_clone().expect("Failed while starting sender thread");
+        let socket = socket
+            .try_clone()
+            .expect("Failed while starting sender thread");
         let mut servers = servers.clone();
 
         thread::spawn(move || {
-            start_sender(socket, &mut servers);
+            start_sender(&socket, &mut servers);
         });
     }
 
@@ -143,5 +147,5 @@ fn main() {
         });
     }
 
-    start_receiver(socket, &mut servers);
+    start_receiver(&socket, &mut servers);
 }

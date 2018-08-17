@@ -1,21 +1,24 @@
 extern crate reverse_proxy;
 
+use reverse_proxy::packet::*;
 use std::env;
-use std::thread;
 use std::error::Error;
 use std::net::UdpSocket;
+use std::thread;
 use std::time::Duration;
-use reverse_proxy::packet::*;
 
 macro_rules! exit {
-    ($msg:expr) => {{ println!($msg); return }};
+    ($msg:expr) => {{
+        println!($msg);
+        return;
+    }};
 }
 
 fn process_request(buffer: &[u8]) -> Result<ProbeResponse, MsgErr> {
     ProbeRequest::from_bytes(buffer).map(ProbeResponse::from_request)
 }
 
-fn start_receiver(socket : UdpSocket) {
+fn start_receiver(socket: UdpSocket) {
     let mut buffer = [0; 64];
 
     loop {

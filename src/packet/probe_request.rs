@@ -1,5 +1,5 @@
+use bincode::{deserialize, serialize, Bounded};
 use packet::message::*;
-use bincode::{serialize, deserialize, Bounded};
 
 #[derive(Serialize, Deserialize)]
 pub struct ProbeRequest {
@@ -8,9 +8,7 @@ pub struct ProbeRequest {
 
 impl ProbeRequest {
     pub fn new(seq: u32) -> ProbeRequest {
-        ProbeRequest {
-            sequence: seq,
-        }
+        ProbeRequest { sequence: seq }
     }
 }
 
@@ -31,8 +29,6 @@ impl SerializablePacket<ProbeRequest> for ProbeRequest {
     }
 
     fn from_bytes(buffer: &[u8]) -> Result<ProbeRequest, MsgErr> {
-        deserialize(&buffer).and_then(|msg: Message|
-            deserialize(&msg.content)
-        )
+        deserialize(&buffer).and_then(|msg: Message| deserialize(&msg.content))
     }
 }

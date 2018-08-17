@@ -11,16 +11,13 @@ pub enum MessageType {
 
 #[derive(Serialize, Deserialize)]
 pub struct Message {
-    pub flag : MessageType,
-    pub content : Vec<u8>,
+    pub flag: MessageType,
+    pub content: Vec<u8>,
 }
 
 impl Message {
     pub fn new(flag: MessageType, content: Vec<u8>) -> Message {
-        Message {
-            flag: flag,
-            content: content,
-        }
+        Message { flag, content }
     }
 
     pub fn new_registration() -> Result<Vec<u8>, MsgErr> {
